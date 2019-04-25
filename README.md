@@ -5,12 +5,17 @@ Page: https://www.gamers-shell.de/
 
 This is a script for a programmable block in Space Engineers. It control and manage all operations of your little mining station. This includes Pistons, Rotor, Survival Kit, Drills and Inventory.
 
+![Example Mining Station](https://github.com/dmorigin/se_mod_mining_manager/blob/master/pictures/screenshot_01.jpg)
+Example Mining Station
+
 # Space Engineers
 
 Space Engineers is a Game developed by Keen Software House. You can find more details about Keen Software House at his official 
 Web Site at https://www.keenswh.com/. Or visit his forum directly at https://forums.keenswh.com/.
 
 ## Features
+
+![View of the programmable block](https://github.com/dmorigin/se_mod_mining_manager/blob/master/pictures/screenshot_02.jpg)
 
 ### Automatic shutdown
 
