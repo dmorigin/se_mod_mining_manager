@@ -24,7 +24,7 @@ namespace IngameScript
         private const float maxFillValue = 0.95f; // max 95%
 
         // the value below the max value, before restart mining
-        private const float reastartFillRatio = 0.70f;
+        private const float restartFillRatio = 0.70f;
 
         // max speed to drop down the drills
         private const float maxDropDownSpeed = 0.01f;
@@ -570,7 +570,7 @@ namespace IngameScript
                     stop();
                     stopped_ = true;
                 }
-                else if (stopped_ && inventory_.FillRatio <= reastartFillRatio)
+                else if (stopped_ && inventory_.FillRatio <= restartFillRatio)
                 {
                     if (!stoppedByUser_)
                     {
