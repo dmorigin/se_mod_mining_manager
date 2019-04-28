@@ -512,6 +512,7 @@ namespace IngameScript
 
         public void Save()
         {
+            Storage = stoppedByUser_ ? "true" : "false";
         }
 
 
@@ -549,7 +550,7 @@ namespace IngameScript
                 {
                     doInit_ = false;
                     stopped_ = true;
-                    stoppedByUser_ = true;
+                    stoppedByUser_ = Storage == "false" ? false : true;
                     Runtime.UpdateFrequency = UpdateFrequency.Update100;
                     flushMessages(lcd_);
                     return;
