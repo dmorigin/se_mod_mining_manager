@@ -33,7 +33,7 @@ namespace IngameScript
         private const float maxDrillRotationSpeed = 0.45f;
 
         // search for blocks that containe this name
-        private const string nameTag = "[MiningManager]";
+        private const string groupName_ = "Mining Manager";
 
         // the name of that motor that rotate the drills directly. Not the name
         // of a motor that rotate the hole arm or other things.
@@ -47,6 +47,7 @@ namespace IngameScript
         RotorController drillRotor_ = null;
         IMyTextSurface lcd_ = null;
         ProductionUnit production_ = null;
+        List<IMyCargoContainer> containers_ = null;
 
 
         private bool doInit_ = true;
@@ -269,7 +270,6 @@ namespace IngameScript
         public class Inventory
         {
             Program parent_ = null;
-            List<IMyCargoContainer> containers_ = new List<IMyCargoContainer>();
 
 
             public Inventory(Program parent)
@@ -278,26 +278,18 @@ namespace IngameScript
             }
 
 
-            public void scanInventoryBlocks()
-            {
-                containers_.Clear();
-                parent_.GridTerminalSystem.GetBlocksOfType<IMyCargoContainer>(containers_, (container) =>
-                {
-                    if (!container.IsSameConstructAs(parent_.Me))
-                        return false;
-
-                    return true;
-                });
-            }
-
             public double FillRatio
             {
                 get
                 {
+                    // no containers found, so inventory is full!
+                    if (Count == 0)
+                        return 1f;
+
                     double max = 0d;
                     double cur = 0d;
 
-                    foreach (var container in containers_)
+                    foreach (var container in parent_.containers_)
                     {
                         var inv = container.GetInventory();
                         max += (double)inv.MaxVolume;
@@ -313,7 +305,7 @@ namespace IngameScript
             {
                 get
                 {
-                    return containers_.Count;
+                    return parent_.containers_.Count;
                 }
             }
         }
@@ -353,38 +345,66 @@ namespace IngameScript
         #region Utility methods
         public bool init()
         {
-            // init pistons
-            pistons_.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyPistonBase>(null, (piston) =>
+            IMyBlockGroup group = GridTerminalSystem.GetBlockGroupWithName(groupName_);
+            if (group != null)
             {
-                PistonController controller = new PistonController(this, piston);
-                pistons_.Add(controller);
+                pistons_.Clear();
+                drills_.Clear();
+
+                group.GetBlocksOfType<IMyTerminalBlock>(null, (block) =>
+                {
+                    IMyPistonBase piston = block as IMyPistonBase;
+                    if (piston != null)
+                    {
+                        PistonController controller = new PistonController(this, piston);
+                        pistons_.Add(controller);
+                        return false;
+                    }
+
+                    IMyMotorStator stator = block as IMyMotorStator;
+                    if (stator != null)
+                    {
+                        drillRotor_ = new RotorController(this, stator);
+                        return false;
+                    }
+
+                    IMyShipDrill drill = block as IMyShipDrill;
+                    if (drill != null)
+                    {
+                        drills_.Add(drill);
+                        return false;
+                    }
+
+                    // production block
+                    IMyProductionBlock pu = block as IMyProductionBlock;
+                    if (pu != null)
+                    {
+                        production_ = new ProductionUnit(this, pu);
+                        return false;
+                    }
+
+                    IMyCargoContainer container = block as IMyCargoContainer;
+                    if (container != null)
+                    {
+                        containers_.Add(container);
+                        return false;
+                    }
+
+                    return false;
+                });
+            }
+            else
+            {
+                addMessageLine("Error: Minig Group not found!");
                 return false;
-            });
+            }
 
-            // init inventory
-            inventory_.scanInventoryBlocks();
-
-            // init rotor
-            IMyMotorStator stator = GridTerminalSystem.GetBlockWithName(drillRotorTag) as IMyMotorStator;
-            if (stator != null)
-                drillRotor_ = new RotorController(this, stator);
-
-            // init drills
-            drills_.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyShipDrill>(drills_);
+            // check drills
             if (drills_.Count == 0)
             {
                 addMessageLine("Error: No drills found!");
                 return false;
             }
-
-            // production block
-            GridTerminalSystem.GetBlocksOfType<IMyProductionBlock>(null, (block) =>
-            {
-                production_ = new ProductionUnit(this, block);
-                return false;
-            });
 
             return true;
         }
@@ -502,6 +522,7 @@ namespace IngameScript
             pistons_ = new List<PistonController>();
             inventory_ = new Inventory(this);
             drills_ = new List<IMyShipDrill>();
+            containers_ = new List<IMyCargoContainer>();
 
             // setup lcd
             lcd_ = Me.GetSurface(0);
