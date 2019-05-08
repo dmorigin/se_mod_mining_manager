@@ -21,23 +21,22 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
         // the max fill value. If this value is arraived mining will stopped.
-        private const float maxFillValue = 0.95f; // max 95%
+        private const float maxFillValue_ = 0.95f; // max 95%
 
         // the value below the max value, before restart mining
-        private const float restartFillRatio = 0.70f;
+        private const float restartFillRatio_ = 0.70f;
 
         // max speed to drop down the drills
-        private const float maxDropDownSpeed = 0.01f;
+        private const float maxDropDownSpeed_ = 0.01f;
 
         // max drill rotation speed
-        private const float maxDrillRotationSpeed = 0.45f;
+        private const float maxDrillRotationSpeed_ = 0.45f;
+
+        // max mining depth
+        private const float maxMiningDepth_ = -1f; // no limit
 
         // search for blocks that containe this name
         private const string groupName_ = "Mining Manager";
-
-        // the name of that motor that rotate the drills directly. Not the name
-        // of a motor that rotate the hole arm or other things.
-        private const string drillRotorTag = "Drill Rotor";
 
 
         // Status Variables - Changed by this script - Don't change it!
@@ -53,9 +52,10 @@ namespace IngameScript
         private bool doInit_ = true;
         private bool stopped_ = true;
         private bool stoppedByUser_ = false;
-        private float dropDownSpeed_ = maxDropDownSpeed;
+        private float dropDownSpeed_ = maxDropDownSpeed_;
         private float dropDownSpeedPerPiston_ = 0f;
-        private float drillRotationSpeed_ = maxDrillRotationSpeed;
+        private float drillRotationSpeed_ = maxDrillRotationSpeed_;
+        private float miningDepth_ = maxMiningDepth_;
         private string messageLine_ = string.Empty;
 
 
@@ -406,6 +406,9 @@ namespace IngameScript
                 return false;
             }
 
+            // read config
+            miningDepth_ = GetConfigMiningDepth();
+
             return true;
         }
 
@@ -512,6 +515,30 @@ namespace IngameScript
             Echo(messageLine_);
             messageLine_ = string.Empty;
         }
+
+
+        public bool GetConfigStoppedByUser()
+        {
+            string[] config = Me.CustomData.Split(new char[] { ';' }, 1, StringSplitOptions.None);
+            if (config.Length >= 1)
+                return config[0] == "false" ? false : true;
+
+            return true; // default is true
+        }
+
+
+        public float GetConfigMiningDepth()
+        {
+            string[] config = Me.CustomData.Split(new char[] { ';' }, 1, StringSplitOptions.None);
+            if (config.Length >= 2)
+            {
+                float value = -1f;
+                if (float.TryParse(config[1], out value))
+                    return value;
+            }
+
+            return maxMiningDepth_;
+        }
         #endregion // Utility methods
 
 
@@ -533,7 +560,7 @@ namespace IngameScript
 
         public void Save()
         {
-            Storage = stoppedByUser_ ? "true" : "false";
+            Me.CustomData = (stoppedByUser_ ? "true" : "false") + ";" + miningDepth_.ToString("###0.0###");
         }
 
 
@@ -551,7 +578,10 @@ namespace IngameScript
 
             addMessageLine("Pistons:             " + pistons_.Count);
             addMessageLine("Piston Velocity: " + dropDownSpeedPerPiston_.ToString("#0.00###") + "m/s (Per Piston)");
-            addMessageLine("Minig Depth:      " + currentMinigDepth().ToString("###0.00") + "m");
+            if (miningDepth_ > 0)
+                addMessageLine("Minig Depth:      " + currentMinigDepth().ToString("###0.00") + "m / " + miningDepth_.ToString("###0.00") + "m");
+            else
+                addMessageLine("Minig Depth:      " + currentMinigDepth().ToString("###0.00") + "m");
             addMessageLine("Drill Rotor:         " + (drillRotor_ != null ? "Found" : "Not Found"));
             addMessageLine("Production Unit: " + (production_ != null ? "Found" : "Not Found"));
 
@@ -571,7 +601,7 @@ namespace IngameScript
                 {
                     doInit_ = false;
                     stopped_ = true;
-                    stoppedByUser_ = Storage == "false" ? false : true;
+                    stoppedByUser_ = GetConfigStoppedByUser();
                     Runtime.UpdateFrequency = UpdateFrequency.Update100;
                     flushMessages(lcd_);
                     return;
@@ -587,12 +617,14 @@ namespace IngameScript
             // normal tick
             if ((updateSource & UpdateType.Update100) != 0)
             {
-                if (!stopped_ && inventory_.FillRatio >= maxFillValue)
+                bool miningDepthArrived = maxMiningDepth_ <= 0f ? false : (currentMinigDepth() >= maxMiningDepth_ ? true : false);
+
+                if (!stopped_ && (inventory_.FillRatio >= maxFillValue_ || miningDepthArrived))
                 {
                     stop();
                     stopped_ = true;
                 }
-                else if (stopped_ && inventory_.FillRatio <= restartFillRatio)
+                else if (stopped_ && (inventory_.FillRatio <= restartFillRatio_ && !miningDepthArrived))
                 {
                     if (!stoppedByUser_)
                     {
@@ -628,6 +660,20 @@ namespace IngameScript
                         stopped_ = true;
                         stoppedByUser_ = true;
                         reset();
+                    }
+
+                    for (int c = 0; c < cl.ArgumentCount; c++)
+                    {
+                        string cmd = cl.Argument(c).ToLower();
+                        if (cmd == "maxdepth")
+                        {
+                            if (cl.ArgumentCount > (c + 1))
+                            {
+                                float value = -1f;
+                                if (float.TryParse(cl.Argument(++c), out value))
+                                    miningDepth_ = value;
+                            }
+                        }
                     }
                 }
             }
